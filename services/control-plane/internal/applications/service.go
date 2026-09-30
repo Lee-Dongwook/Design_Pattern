@@ -2,9 +2,10 @@ package applications
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/Design_Pattern/services/control-plane/internal/domain/run"
@@ -16,7 +17,6 @@ type Service struct {
 	runs      outbound.RunRepository
 	tasks     outbound.TaskRepository
 	now       func() time.Time
-	sequence  atomic.Uint64
 }
 
 func NewService(pipelines outbound.PipelineRepository, runs outbound.RunRepository, tasks outbound.TaskRepository) *Service {
@@ -61,7 +61,10 @@ func (s *Service) CreateRun(ctx context.Context, pipelineID string) (Run, error)
 	}
 
 	now := s.now().UTC()
-	id := fmt.Sprintf("run-%06d", s.sequence.Add(1))
+	id, err := newRunID(now)
+	if err != nil {
+		return Run{}, err
+	}
 	domainRun, err := run.New(run.ID(id), storedPipeline.Definition, now)
 	if err != nil {
 		return Run{}, err
@@ -174,6 +177,14 @@ func fromStoredRun(value outbound.StoredRun) Run {
 }
 
 var _ API = (*Service)(nil)
+
+func newRunID(now time.Time) (string, error) {
+	random := make([]byte, 8)
+	if _, err := rand.Read(random); err != nil {
+		return "", fmt.Errorf("generate run ID: %w", err)
+	}
+	return fmt.Sprintf("run-%d-%s", now.UnixNano(), hex.EncodeToString(random)), nil
+}
 
 func (s *Service) transitionRun(ctx context.Context, id string, next run.Status) error {
 	stored, found, err := s.runs.Get(ctx, id)

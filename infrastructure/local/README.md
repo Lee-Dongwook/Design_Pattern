@@ -53,6 +53,16 @@ docker compose down
 
 호스트에서 실행하는 애플리케이션은 localhost의 공개 포트를 사용한다.
 
+Control Plane을 PostgreSQL 모드로 실행하려면 아래처럼 `DATABASE_URL`을 설정한다.
+
+```bash
+export DATABASE_URL='postgres://devops:local-dev-only@localhost:5432/devops?sslmode=disable'
+cd ../../services/control-plane
+go run ./cmd/server
+```
+
+`DATABASE_URL`이 없으면 Control Plane은 기존과 동일하게 인메모리 저장소로 동작한다.
+
 추후 같은 Compose 네트워크에 애플리케이션을 추가하면
 postgres:5432, registry:5000 주소를 사용한다.
 
