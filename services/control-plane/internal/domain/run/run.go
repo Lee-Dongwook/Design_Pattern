@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/Design_Pattern/services/control-plane/internal/domain/pipeline"
 )
 
 type ID string
@@ -21,12 +23,13 @@ const (
 type Run struct {
 	id        ID
 	status    Status
+	snapshot  pipeline.Snapshot
 	createdAt time.Time
 	startedAt time.Time
 	endedAt   time.Time
 }
 
-func New(id ID, now time.Time) (*Run, error) {
+func New(id ID, definition pipeline.Pipeline, now time.Time) (*Run, error) {
 	if strings.TrimSpace(string(id)) == "" {
 		return nil, fmt.Errorf("run ID is required")
 	}
@@ -35,9 +38,15 @@ func New(id ID, now time.Time) (*Run, error) {
 		return nil, fmt.Errorf("creation time is required")
 	}
 
+	snapshot, err := definition.Snapshot()
+	if err != nil {
+		return nil, fmt.Errorf("invalid pipeline definition: %w", err)
+	}
+
 	return &Run{
 		id:        id,
 		status:    StatusPending,
+		snapshot:  snapshot,
 		createdAt: now.UTC(),
 	}, nil
 }
@@ -76,6 +85,10 @@ func (r *Run) Fail(now time.Time) error {
 
 func (r *Run) Cancel(now time.Time) error {
 	return r.transition(StatusCanceled, now)
+}
+
+func (r *Run) Definition() pipeline.Snapshot {
+	return r.snapshot
 }
 
 func (r *Run) transition(next Status, now time.Time) error {

@@ -1,8 +1,11 @@
 package run
 
 import (
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/Design_Pattern/services/control-plane/internal/domain/pipeline"
 )
 
 func TestRunTransitions(t *testing.T) {
@@ -63,7 +66,7 @@ func TestRunTransitions(t *testing.T) {
 					t.Fatal("expected transition to be rejected")
 				}
 
-				if *r != before {
+				if !reflect.DeepEqual(*r, before) {
 					t.Fatal("rejected transition changed the run")
 				}
 				return
@@ -149,7 +152,7 @@ func TestRunRejectsInvalidTransitionTime(t *testing.T) {
 				t.Fatal("expected invalid time to be rejected")
 			}
 
-			if *r != before {
+			if !reflect.DeepEqual(*r, before) {
 				t.Fatal("rejected transition changed the run")
 			}
 		})
@@ -159,7 +162,18 @@ func TestRunRejectsInvalidTransitionTime(t *testing.T) {
 func newRunAtStatus(t *testing.T, status Status, base time.Time) *Run {
 	t.Helper()
 
-	r, err := New("run-001", base)
+	definition := pipeline.Pipeline{
+		Name: "example",
+		Tasks: []pipeline.Task{
+			{
+				ID:      "build",
+				Image:   "test-image",
+				Command: []string{"echo", "ok"},
+			},
+		},
+	}
+
+	r, err := New("run-001", definition, base)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,5 +207,57 @@ func applyTransition(r *Run, to Status, at time.Time) error {
 		return r.Cancel(at)
 	default:
 		panic("unsupported test status: " + string(to))
+	}
+}
+
+func TestRunPreservesPipelineSnapshot(t *testing.T) {
+	base := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
+
+	definition := pipeline.Pipeline{
+		Name: "original",
+		Tasks: []pipeline.Task{
+			{
+				ID:      "build",
+				Image:   "build-image",
+				Command: []string{"echo", "build"},
+			},
+			{
+				ID:        "test",
+				Image:     "test-image",
+				Command:   []string{"echo", "test"},
+				DependsOn: []pipeline.TaskID{"build"},
+			},
+		},
+	}
+
+	r, err := New("run-001", definition, base)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := r.Definition().Tasks()
+
+	// Mutating the original must not change the run.
+	definition.Name = "changed"
+	definition.Tasks[0].Image = "changed-image"
+	definition.Tasks[0].Command[0] = "changed-command"
+	definition.Tasks[1].DependsOn[0] = "missing"
+
+	if r.Definition().Name() != "original" {
+		t.Fatal("original mutation changed the snapshot name")
+	}
+
+	if !reflect.DeepEqual(r.Definition().Tasks(), expected) {
+		t.Fatal("original mutation changed the snapshot tasks")
+	}
+
+	// Mutating returned data must not change the run either.
+	returned := r.Definition().Tasks()
+	returned[0].ID = "changed"
+	returned[0].Command[0] = "changed-command"
+	returned[1].DependsOn[0] = "missing"
+
+	if !reflect.DeepEqual(r.Definition().Tasks(), expected) {
+		t.Fatal("returned data mutation changed the snapshot tasks")
 	}
 }
