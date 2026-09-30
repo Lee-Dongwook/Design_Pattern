@@ -11,18 +11,18 @@ paths:
       summary: Health check
       operationId: getHealth
       responses:
-        '200':
+        "200":
           description: Service is available
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Health'
+                $ref: "#/components/schemas/Health"
   /pipelines:
     get:
       summary: List pipeline definitions
       operationId: listPipelines
       responses:
-        '200':
+        "200":
           description: Pipeline definitions
           content:
             application/json:
@@ -33,7 +33,7 @@ paths:
                   pipelines:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Pipeline'
+                      $ref: "#/components/schemas/Pipeline"
     post:
       summary: Create or replace a pipeline definition
       operationId: savePipeline
@@ -42,16 +42,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Pipeline'
+              $ref: "#/components/schemas/Pipeline"
       responses:
-        '201':
+        "201":
           description: Saved pipeline definition
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Pipeline'
-        '400':
-          $ref: '#/components/responses/ValidationError'
+                $ref: "#/components/schemas/Pipeline"
+        "400":
+          $ref: "#/components/responses/ValidationError"
   /runs:
     post:
       summary: Start a run from a saved pipeline
@@ -67,19 +67,19 @@ paths:
                 pipelineId:
                   type: string
       responses:
-        '201':
+        "201":
           description: Created run
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Run'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/Run"
+        "404":
+          $ref: "#/components/responses/NotFound"
     get:
       summary: List runs
       operationId: listRuns
       responses:
-        '200':
+        "200":
           description: Runs
           content:
             application/json:
@@ -90,22 +90,22 @@ paths:
                   runs:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Run'
+                      $ref: "#/components/schemas/Run"
   /runs/{runId}:
     get:
       summary: Get a run
       operationId: getRun
       parameters:
-        - $ref: '#/components/parameters/RunID'
+        - $ref: "#/components/parameters/RunID"
       responses:
-        '200':
+        "200":
           description: Run
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Run'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/Run"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /runner/tasks/claim:
     post:
       summary: Claim the next runnable task
@@ -121,13 +121,13 @@ paths:
                 runnerId:
                   type: string
       responses:
-        '200':
+        "200":
           description: A task was claimed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskAssignment'
-        '204':
+                $ref: "#/components/schemas/TaskAssignment"
+        "204":
           description: No runnable task is available
   /runner/tasks/{taskId}/events:
     post:
@@ -144,12 +144,12 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TaskEvent'
+              $ref: "#/components/schemas/TaskEvent"
       responses:
-        '204':
+        "204":
           description: Event accepted
-        '404':
-          $ref: '#/components/responses/NotFound'
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   parameters:
     RunID:
@@ -164,13 +164,13 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: "#/components/schemas/Error"
     ValidationError:
       description: Request does not satisfy the domain rules
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: "#/components/schemas/Error"
   schemas:
     Health:
       type: object
@@ -191,7 +191,7 @@ components:
           type: array
           minItems: 1
           items:
-            $ref: '#/components/schemas/Task'
+            $ref: "#/components/schemas/Task"
     Task:
       type: object
       required: [id, image, command]
@@ -224,10 +224,10 @@ components:
           type: string
           format: date-time
         startedAt:
-          type: [string, 'null']
+          type: [string, "null"]
           format: date-time
         endedAt:
-          type: [string, 'null']
+          type: [string, "null"]
           format: date-time
     TaskAssignment:
       type: object
@@ -238,7 +238,7 @@ components:
         runId:
           type: string
         task:
-          $ref: '#/components/schemas/Task'
+          $ref: "#/components/schemas/Task"
     TaskEvent:
       type: object
       required: [status]
