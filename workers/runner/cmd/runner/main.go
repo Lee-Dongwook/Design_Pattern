@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Design_Pattern/workers/runner/internal/adapters/container"
 	"github.com/Design_Pattern/workers/runner/internal/agent"
 	"github.com/Design_Pattern/workers/runner/internal/execution"
 )
@@ -24,7 +25,17 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	client := agent.NewClient(baseURL, runnerID)
-	executor := execution.LocalExecutor{}
+	var executor execution.Executor
+	switch os.Getenv("RUNNER_EXECUTOR") {
+	case "", "docker":
+		executor = container.NewDockerExecutor()
+		log.Print("using Docker task executor")
+	case "local":
+		executor = execution.LocalExecutor{}
+		log.Print("using local task executor; do not use this mode in shared environments")
+	default:
+		log.Fatalf("unsupported RUNNER_EXECUTOR %q", os.Getenv("RUNNER_EXECUTOR"))
+	}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {

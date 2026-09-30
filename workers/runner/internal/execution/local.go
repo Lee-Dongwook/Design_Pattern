@@ -6,7 +6,10 @@ import (
 	"os/exec"
 )
 
-type Task struct{ Command []string }
+type Task struct {
+	Image   string
+	Command []string
+}
 type Executor interface {
 	Execute(context.Context, Task) error
 }

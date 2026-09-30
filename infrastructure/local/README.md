@@ -63,6 +63,17 @@ go run ./cmd/server
 
 `DATABASE_URL`이 없으면 Control Plane은 기존과 동일하게 인메모리 저장소로 동작한다.
 
+Runner는 기본적으로 각 task를 Docker 컨테이너에서 실행한다. 실행 컨테이너는
+네트워크를 사용하지 않고, read-only 파일 시스템·권한 제거·CPU/메모리/PID 제한을 적용한다.
+따라서 Docker Desktop 또는 Docker Engine이 실행 중이어야 한다.
+
+```bash
+cd ../../workers/runner
+CONTROL_PLANE_URL=http://localhost:8080 go run ./cmd/runner
+```
+
+호스트에서 직접 명령을 실행하는 `RUNNER_EXECUTOR=local`은 개발 확인 외에는 사용하지 않는다.
+
 추후 같은 Compose 네트워크에 애플리케이션을 추가하면
 postgres:5432, registry:5000 주소를 사용한다.
 

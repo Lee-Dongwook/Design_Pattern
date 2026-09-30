@@ -15,7 +15,7 @@ const samplePipeline = {
   id: "hello-pipeline",
   name: "Hello pipeline",
   tasks: [
-    { id: "hello", image: "local", command: ["echo", "hello from runner"] },
+    { id: "hello", image: "alpine:3.20", command: ["echo", "hello from runner"] },
   ],
 };
 

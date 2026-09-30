@@ -20,6 +20,7 @@ type Client struct {
 type assignment struct {
 	ID   string `json:"id"`
 	Task struct {
+		Image   string   `json:"image"`
 		Command []string `json:"command"`
 	} `json:"task"`
 }
@@ -36,7 +37,7 @@ func RunOnce(ctx context.Context, client *Client, executor execution.Executor) e
 	if err := client.report(ctx, task.ID, "started", ""); err != nil {
 		return err
 	}
-	if err := executor.Execute(ctx, execution.Task{Command: task.Task.Command}); err != nil {
+	if err := executor.Execute(ctx, execution.Task{Image: task.Task.Image, Command: task.Task.Command}); err != nil {
 		if reportErr := client.report(ctx, task.ID, "failed", err.Error()); reportErr != nil {
 			return fmt.Errorf("execute task: %w; report failure: %v", err, reportErr)
 		}
