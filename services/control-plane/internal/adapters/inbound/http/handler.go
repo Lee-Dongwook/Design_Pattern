@@ -104,6 +104,18 @@ func NewHandler(api applications.API) http.Handler {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"tasks": response})
 	})
+	mux.HandleFunc("POST /runs/{runId}/cancel", func(w http.ResponseWriter, r *http.Request) {
+		canceled, found, err := api.CancelRun(r.Context(), r.PathValue("runId"))
+		if err != nil {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		if !found {
+			writeError(w, http.StatusNotFound, "run not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, toRunResponse(canceled))
+	})
 	mux.HandleFunc("POST /runner/tasks/claim", func(w http.ResponseWriter, r *http.Request) {
 		var request struct {
 			RunnerID string `json:"runnerId"`

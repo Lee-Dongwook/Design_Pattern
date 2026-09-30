@@ -46,6 +46,7 @@ type API interface {
 	CreateRun(context.Context, string) (Run, error)
 	ListRuns(context.Context) ([]Run, error)
 	GetRun(context.Context, string) (Run, bool, error)
+	CancelRun(context.Context, string) (Run, bool, error)
 	ListRunTasks(context.Context, string) ([]TaskExecution, bool, error)
 	ClaimTask(context.Context, string) (TaskAssignment, bool, error)
 	ReportTaskEvent(context.Context, string, TaskEventStatus, string) (bool, error)

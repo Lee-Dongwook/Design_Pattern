@@ -106,6 +106,27 @@ paths:
                 $ref: "#/components/schemas/Run"
         "404":
           $ref: "#/components/responses/NotFound"
+  /runs/{runId}/cancel:
+    post:
+      summary: Cancel a pending or running run
+      operationId: cancelRun
+      parameters:
+        - $ref: "#/components/parameters/RunID"
+      responses:
+        "200":
+          description: Canceled run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Run is already in a terminal state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /runner/tasks/claim:
     post:
       summary: Claim the next runnable task

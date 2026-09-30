@@ -100,6 +100,32 @@ func (s *Service) GetRun(ctx context.Context, id string) (Run, bool, error) {
 	stored, found, err := s.runs.Get(ctx, id)
 	return fromStoredRun(stored), found, err
 }
+func (s *Service) CancelRun(ctx context.Context, id string) (Run, bool, error) {
+	stored, found, err := s.runs.Get(ctx, id)
+	if err != nil || !found {
+		return Run{}, found, err
+	}
+	if stored.Status != run.StatusPending && stored.Status != run.StatusRunning {
+		return Run{}, true, fmt.Errorf("run %q cannot be canceled from %q", id, stored.Status)
+	}
+	tasks, err := s.tasks.ListByRun(ctx, id)
+	if err != nil {
+		return Run{}, true, err
+	}
+	for _, task := range tasks {
+		if task.Status == outbound.TaskPending {
+			task.Status = outbound.TaskCanceled
+			if err := s.tasks.Save(ctx, task); err != nil {
+				return Run{}, true, err
+			}
+		}
+	}
+	if err := s.transitionRun(ctx, id, run.StatusCanceled); err != nil {
+		return Run{}, true, err
+	}
+	updated, _, err := s.runs.Get(ctx, id)
+	return fromStoredRun(updated), true, err
+}
 func (s *Service) ListRunTasks(ctx context.Context, runID string) ([]TaskExecution, bool, error) {
 	if _, found, err := s.runs.Get(ctx, runID); err != nil || !found {
 		return nil, found, err
@@ -129,6 +155,13 @@ func (s *Service) ReportTaskEvent(ctx context.Context, taskID string, status Tas
 	task, found, err := s.tasks.Get(ctx, taskID)
 	if err != nil || !found {
 		return found, err
+	}
+	if parent, exists, err := s.runs.Get(ctx, task.RunID); err != nil {
+		return true, err
+	} else if exists && parent.Status == run.StatusCanceled {
+		task.Status = outbound.TaskCanceled
+		task.Log = appendLog(task.Log, "task event ignored: run was canceled\n"+message)
+		return true, s.tasks.Save(ctx, task)
 	}
 	switch status {
 	case TaskEventStarted:

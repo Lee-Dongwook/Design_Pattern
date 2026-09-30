@@ -32,6 +32,7 @@ const (
 	TaskRunning   TaskStatus = "running"
 	TaskSucceeded TaskStatus = "succeeded"
 	TaskFailed    TaskStatus = "failed"
+	TaskCanceled  TaskStatus = "canceled"
 )
 
 type StoredTask struct {

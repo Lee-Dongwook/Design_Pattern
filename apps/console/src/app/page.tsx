@@ -108,6 +108,9 @@ export default function Home() {
     const response = await fetch(`${api}/runs/${runId}/tasks`);
     if (response.ok) setTasks((await response.json()).tasks);
   }
+  async function cancelRun(runId: string) {
+    setBusy(true); try { const response = await fetch(`${api}/runs/${runId}/cancel`, { method: "POST" }); if (!response.ok) throw new Error((await response.json()).message ?? "실행을 취소하지 못했습니다."); await refresh(); await showTasks(runId); setMessage("실행을 취소했습니다."); } catch (error) { setMessage(error instanceof Error ? error.message : "취소에 실패했습니다."); } finally { setBusy(false); }
+  }
 
   return (
     <main>
@@ -184,6 +187,7 @@ export default function Home() {
                   </p>
                 </div>
                 <span className={`status ${run.status}`}>{run.status}</span>
+                {(run.status === "pending" || run.status === "running") && <button onClick={(event) => { event.stopPropagation(); void cancelRun(run.id); }} disabled={busy}>취소</button>}
               </article>
             ))}
           </div>
