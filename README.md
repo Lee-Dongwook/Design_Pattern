@@ -22,6 +22,12 @@ Language : Console = TypeScript, Control Plane·Runner = Go, Infrastructure = HC
 
 ![Port and adapter dependency flow](docs/img/port-adapter-dependency-flow.png)
 
+### Demo video
+
+[Console Pipeline 실행 데모 보기](docs/video/console-run-demo.mp4)
+
+Pipeline 생성, Docker Runner 실행, task 상태·로그 조회 흐름을 담은 로컬 데모 영상입니다.
+
 ```
 devops-platform/
 ├── apps/
