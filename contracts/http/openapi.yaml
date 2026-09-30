@@ -1,0 +1,256 @@
+openapi: 3.1.0
+info:
+  title: DevOps Platform Control Plane API
+  version: 0.1.0
+  description: MVP contract for pipeline definitions, runs, and runner task reporting.
+servers:
+  - url: http://localhost:8080
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /pipelines:
+    get:
+      summary: List pipeline definitions
+      operationId: listPipelines
+      responses:
+        '200':
+          description: Pipeline definitions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pipelines]
+                properties:
+                  pipelines:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Pipeline'
+    post:
+      summary: Create or replace a pipeline definition
+      operationId: savePipeline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pipeline'
+      responses:
+        '201':
+          description: Saved pipeline definition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pipeline'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /runs:
+    post:
+      summary: Start a run from a saved pipeline
+      operationId: createRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pipelineId]
+              properties:
+                pipelineId:
+                  type: string
+      responses:
+        '201':
+          description: Created run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    get:
+      summary: List runs
+      operationId: listRuns
+      responses:
+        '200':
+          description: Runs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runs]
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Run'
+  /runs/{runId}:
+    get:
+      summary: Get a run
+      operationId: getRun
+      parameters:
+        - $ref: '#/components/parameters/RunID'
+      responses:
+        '200':
+          description: Run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /runner/tasks/claim:
+    post:
+      summary: Claim the next runnable task
+      operationId: claimTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [runnerId]
+              properties:
+                runnerId:
+                  type: string
+      responses:
+        '200':
+          description: A task was claimed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskAssignment'
+        '204':
+          description: No runnable task is available
+  /runner/tasks/{taskId}/events:
+    post:
+      summary: Report a task lifecycle event
+      operationId: reportTaskEvent
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskEvent'
+      responses:
+        '204':
+          description: Event accepted
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  parameters:
+    RunID:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    NotFound:
+      description: Resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Request does not satisfy the domain rules
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: ok
+    Pipeline:
+      type: object
+      required: [id, name, tasks]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        tasks:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Task'
+    Task:
+      type: object
+      required: [id, image, command]
+      properties:
+        id:
+          type: string
+        image:
+          type: string
+        command:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        dependsOn:
+          type: array
+          items:
+            type: string
+    Run:
+      type: object
+      required: [id, pipelineId, status, createdAt]
+      properties:
+        id:
+          type: string
+        pipelineId:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, succeeded, failed, canceled]
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: [string, 'null']
+          format: date-time
+        endedAt:
+          type: [string, 'null']
+          format: date-time
+    TaskAssignment:
+      type: object
+      required: [id, runId, task]
+      properties:
+        id:
+          type: string
+        runId:
+          type: string
+        task:
+          $ref: '#/components/schemas/Task'
+    TaskEvent:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [started, succeeded, failed]
+        message:
+          type: string
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
