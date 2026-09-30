@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runner
+  labels:
+    app.kubernetes.io/name: runner
+    app.kubernetes.io/part-of: devops-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: runner
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: runner
+        app.kubernetes.io/part-of: devops-platform
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: runner
+          image: registry.example.invalid/devops-platform/runner:placeholder
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CONTROL_PLANE_URL
+              value: http://control-plane:8080
+            - name: RUNNER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: WORKSPACE_DIR
+              value: /workspace
+            - name: LOG_LEVEL
+              value: info
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+      volumes:
+        - name: workspace
+          emptyDir:
+            sizeLimit: 2Gi
