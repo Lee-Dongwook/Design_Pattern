@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      intervals: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  registry:
+    image: registry:3
+    restart: unless-stopped
+    environment:
+      REGISTRY_HTTP_ADDR: "0.0.0.0:5000"
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+    ports:
+      - "127.0.0.1:${REGISTRY_PORT:-5001}:5000"
+    volumes:
+      - registry-data:/var/lib/registry
+
+volumes:
+  postgres-data:
+  registry-data:
