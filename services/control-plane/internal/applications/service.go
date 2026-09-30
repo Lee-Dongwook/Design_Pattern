@@ -100,6 +100,20 @@ func (s *Service) GetRun(ctx context.Context, id string) (Run, bool, error) {
 	stored, found, err := s.runs.Get(ctx, id)
 	return fromStoredRun(stored), found, err
 }
+func (s *Service) ListRunTasks(ctx context.Context, runID string) ([]TaskExecution, bool, error) {
+	if _, found, err := s.runs.Get(ctx, runID); err != nil || !found {
+		return nil, found, err
+	}
+	tasks, err := s.tasks.ListByRun(ctx, runID)
+	if err != nil {
+		return nil, true, err
+	}
+	result := make([]TaskExecution, 0, len(tasks))
+	for _, task := range tasks {
+		result = append(result, TaskExecution{ID: task.ID, TaskID: string(task.Task.ID), Status: string(task.Status), RunnerID: task.RunnerID, Log: task.Log})
+	}
+	return result, true, nil
+}
 
 func (s *Service) ClaimTask(ctx context.Context, runnerID string) (TaskAssignment, bool, error) {
 	if strings.TrimSpace(runnerID) == "" {
@@ -111,7 +125,7 @@ func (s *Service) ClaimTask(ctx context.Context, runnerID string) (TaskAssignmen
 	}
 	return TaskAssignment{ID: claimed.ID, RunID: claimed.RunID, Task: claimed.Task}, true, nil
 }
-func (s *Service) ReportTaskEvent(ctx context.Context, taskID string, status TaskEventStatus, _ string) (bool, error) {
+func (s *Service) ReportTaskEvent(ctx context.Context, taskID string, status TaskEventStatus, message string) (bool, error) {
 	task, found, err := s.tasks.Get(ctx, taskID)
 	if err != nil || !found {
 		return found, err
@@ -131,6 +145,7 @@ func (s *Service) ReportTaskEvent(ctx context.Context, taskID string, status Tas
 			return true, fmt.Errorf("task %q cannot succeed from %q", taskID, task.Status)
 		}
 		task.Status = outbound.TaskSucceeded
+		task.Log = appendLog(task.Log, message)
 		if err := s.tasks.Save(ctx, task); err != nil {
 			return true, err
 		}
@@ -149,6 +164,7 @@ func (s *Service) ReportTaskEvent(ctx context.Context, taskID string, status Tas
 			return true, fmt.Errorf("task %q cannot fail from %q", taskID, task.Status)
 		}
 		task.Status = outbound.TaskFailed
+		task.Log = appendLog(task.Log, message)
 		if err := s.tasks.Save(ctx, task); err != nil {
 			return true, err
 		}
@@ -156,6 +172,15 @@ func (s *Service) ReportTaskEvent(ctx context.Context, taskID string, status Tas
 	default:
 		return true, fmt.Errorf("unsupported task event status %q", status)
 	}
+}
+func appendLog(current, message string) string {
+	if strings.TrimSpace(message) == "" {
+		return current
+	}
+	if current == "" {
+		return message
+	}
+	return current + "\n" + message
 }
 
 func toRun(id, pipelineID string, value *run.Run) Run {

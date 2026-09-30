@@ -20,20 +20,20 @@ func NewDockerExecutor() DockerExecutor {
 	}}
 }
 
-func (e DockerExecutor) Execute(ctx context.Context, task execution.Task) error {
+func (e DockerExecutor) Execute(ctx context.Context, task execution.Task) (execution.Result, error) {
 	if strings.TrimSpace(task.Image) == "" {
-		return fmt.Errorf("task image is required")
+		return execution.Result{}, fmt.Errorf("task image is required")
 	}
 	if len(task.Command) == 0 {
-		return fmt.Errorf("task command is required")
+		return execution.Result{}, fmt.Errorf("task command is required")
 	}
 	arguments := []string{"run", "--rm", "--network", "none", "--read-only", "--cap-drop", "ALL", "--pids-limit", "256", "--memory", "512m", "--cpus", "1", task.Image}
 	arguments = append(arguments, task.Command...)
 	output, err := e.run(ctx, "docker", arguments...)
 	if err != nil {
-		return fmt.Errorf("container task failed: %w: %s", err, strings.TrimSpace(string(output)))
+		return execution.Result{Output: string(output)}, fmt.Errorf("container task failed: %w", err)
 	}
-	return nil
+	return execution.Result{Output: string(output)}, nil
 }
 
 var _ execution.Executor = DockerExecutor{}

@@ -16,7 +16,7 @@ func TestDockerExecutorUsesRestrictedContainerOptions(t *testing.T) {
 		arguments = gotArguments
 		return nil, nil
 	}}
-	if err := executor.Execute(context.Background(), execution.Task{Image: "alpine:3.20", Command: []string{"echo", "ok"}}); err != nil {
+	if _, err := executor.Execute(context.Background(), execution.Task{Image: "alpine:3.20", Command: []string{"echo", "ok"}}); err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"run", "--rm", "--network", "none", "--read-only", "--cap-drop", "ALL", "--pids-limit", "256", "--memory", "512m", "--cpus", "1", "alpine:3.20", "echo", "ok"}

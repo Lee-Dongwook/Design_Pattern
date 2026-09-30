@@ -9,6 +9,7 @@ type Run = {
   status: "pending" | "running" | "succeeded" | "failed" | "canceled";
   createdAt: string;
 };
+type TaskExecution = { id: string; taskId: string; status: string; runnerId: string; log: string };
 
 const api = "/api/control-plane";
 const samplePipeline = {
@@ -24,6 +25,8 @@ export default function Home() {
   const [runs, setRuns] = useState<Run[]>([]);
   const [message, setMessage] = useState("Control Plane에 연결하는 중입니다.");
   const [busy, setBusy] = useState(false);
+  const [selectedRun, setSelectedRun] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<TaskExecution[]>([]);
 
   const refresh = useCallback(async () => {
     try {
@@ -100,6 +103,12 @@ export default function Home() {
     }
   }
 
+  async function showTasks(runId: string) {
+    setSelectedRun(runId);
+    const response = await fetch(`${api}/runs/${runId}/tasks`);
+    if (response.ok) setTasks((await response.json()).tasks);
+  }
+
   return (
     <main>
       <header>
@@ -166,7 +175,7 @@ export default function Home() {
         ) : (
           <div className="list">
             {runs.map((run) => (
-              <article key={run.id}>
+              <article key={run.id} onClick={() => void showTasks(run.id)}>
                 <div>
                   <h3>{run.id}</h3>
                   <p>
@@ -180,6 +189,9 @@ export default function Home() {
           </div>
         )}
       </section>
+      {selectedRun && <section className="panel"><div className="section-heading"><div><h2>실행 상세</h2><p>{selectedRun} · 작업 로그</p></div></div>
+        {tasks.length === 0 ? <div className="empty">작업 정보를 불러오는 중이거나 아직 없습니다.</div> : <div className="list">{tasks.map((task) => <article key={task.id}><div><h3>{task.taskId} <span className={`status ${task.status}`}>{task.status}</span></h3><p>Runner: {task.runnerId || "대기 중"}</p>{task.log && <pre>{task.log}</pre>}</div></article>)}</div>}
+      </section>}
     </main>
   );
 }

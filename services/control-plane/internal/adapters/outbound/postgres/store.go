@@ -113,7 +113,7 @@ func (r *taskRepository) Enqueue(ctx context.Context, values []outbound.StoredTa
 		if err != nil {
 			return err
 		}
-		batch.Queue(`INSERT INTO tasks (id, run_id, task, status, runner_id) VALUES ($1,$2,$3,$4,$5)`, value.ID, value.RunID, task, value.Status, value.RunnerID)
+		batch.Queue(`INSERT INTO tasks (id, run_id, task, status, runner_id, log) VALUES ($1,$2,$3,$4,$5,$6)`, value.ID, value.RunID, task, value.Status, value.RunnerID, value.Log)
 	}
 	results := r.store.pool.SendBatch(ctx, batch)
 	defer results.Close()
@@ -125,7 +125,7 @@ func (r *taskRepository) Enqueue(ctx context.Context, values []outbound.StoredTa
 	return nil
 }
 func (r *taskRepository) ClaimNextRunnable(ctx context.Context, runnerID string) (outbound.StoredTask, bool, error) {
-	row := r.store.pool.QueryRow(ctx, `WITH candidate AS (SELECT t.id FROM tasks t WHERE t.status = 'pending' AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(t.task->'DependsOn', '[]'::jsonb)) AS dependency(task_id) JOIN tasks prerequisite ON prerequisite.run_id = t.run_id AND prerequisite.task->>'ID' = dependency.task_id WHERE prerequisite.status <> 'succeeded') ORDER BY t.created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE tasks t SET status = 'claimed', runner_id = $1 FROM candidate WHERE t.id = candidate.id RETURNING t.id, t.run_id, t.task, t.status, t.runner_id`, runnerID)
+	row := r.store.pool.QueryRow(ctx, `WITH candidate AS (SELECT t.id FROM tasks t WHERE t.status = 'pending' AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(t.task->'DependsOn', '[]'::jsonb)) AS dependency(task_id) JOIN tasks prerequisite ON prerequisite.run_id = t.run_id AND prerequisite.task->>'ID' = dependency.task_id WHERE prerequisite.status <> 'succeeded') ORDER BY t.created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE tasks t SET status = 'claimed', runner_id = $1 FROM candidate WHERE t.id = candidate.id RETURNING t.id, t.run_id, t.task, t.status, t.runner_id, t.log`, runnerID)
 	value, err := scanTask(row)
 	if err == pgx.ErrNoRows {
 		return outbound.StoredTask{}, false, nil
@@ -133,7 +133,7 @@ func (r *taskRepository) ClaimNextRunnable(ctx context.Context, runnerID string)
 	return value, err == nil, err
 }
 func (r *taskRepository) Get(ctx context.Context, id string) (outbound.StoredTask, bool, error) {
-	value, err := scanTask(r.store.pool.QueryRow(ctx, `SELECT id, run_id, task, status, runner_id FROM tasks WHERE id = $1`, id))
+	value, err := scanTask(r.store.pool.QueryRow(ctx, `SELECT id, run_id, task, status, runner_id, log FROM tasks WHERE id = $1`, id))
 	if err == pgx.ErrNoRows {
 		return outbound.StoredTask{}, false, nil
 	}
@@ -144,11 +144,11 @@ func (r *taskRepository) Save(ctx context.Context, value outbound.StoredTask) er
 	if err != nil {
 		return err
 	}
-	_, err = r.store.pool.Exec(ctx, `UPDATE tasks SET task = $2, status = $3, runner_id = $4 WHERE id = $1`, value.ID, task, value.Status, value.RunnerID)
+	_, err = r.store.pool.Exec(ctx, `UPDATE tasks SET task = $2, status = $3, runner_id = $4, log = $5 WHERE id = $1`, value.ID, task, value.Status, value.RunnerID, value.Log)
 	return err
 }
 func (r *taskRepository) ListByRun(ctx context.Context, runID string) ([]outbound.StoredTask, error) {
-	rows, err := r.store.pool.Query(ctx, `SELECT id, run_id, task, status, runner_id FROM tasks WHERE run_id = $1 ORDER BY id`, runID)
+	rows, err := r.store.pool.Query(ctx, `SELECT id, run_id, task, status, runner_id, log FROM tasks WHERE run_id = $1 ORDER BY id`, runID)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func scanRun(row rowScanner) (outbound.StoredRun, error) {
 func scanTask(row rowScanner) (outbound.StoredTask, error) {
 	var value outbound.StoredTask
 	var task []byte
-	if err := row.Scan(&value.ID, &value.RunID, &task, &value.Status, &value.RunnerID); err != nil {
+	if err := row.Scan(&value.ID, &value.RunID, &task, &value.Status, &value.RunnerID, &value.Log); err != nil {
 		return value, err
 	}
 	if err := json.Unmarshal(task, &value.Task); err != nil {

@@ -23,8 +23,10 @@ CREATE TABLE IF NOT EXISTS tasks (
   task JSONB NOT NULL,
   status TEXT NOT NULL,
   runner_id TEXT NOT NULL DEFAULT '',
+  log TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS tasks_claim_idx ON tasks (status, created_at);
 CREATE INDEX IF NOT EXISTS tasks_run_id_idx ON tasks (run_id);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS log TEXT NOT NULL DEFAULT '';

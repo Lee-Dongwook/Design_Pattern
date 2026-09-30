@@ -40,6 +40,7 @@ type StoredTask struct {
 	Task     pipeline.Task
 	Status   TaskStatus
 	RunnerID string
+	Log      string
 }
 
 type PipelineRepository interface {

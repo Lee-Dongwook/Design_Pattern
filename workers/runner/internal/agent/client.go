@@ -37,13 +37,18 @@ func RunOnce(ctx context.Context, client *Client, executor execution.Executor) e
 	if err := client.report(ctx, task.ID, "started", ""); err != nil {
 		return err
 	}
-	if err := executor.Execute(ctx, execution.Task{Image: task.Task.Image, Command: task.Task.Command}); err != nil {
-		if reportErr := client.report(ctx, task.ID, "failed", err.Error()); reportErr != nil {
+	result, err := executor.Execute(ctx, execution.Task{Image: task.Task.Image, Command: task.Task.Command})
+	if err != nil {
+		message := result.Output
+		if message == "" {
+			message = err.Error()
+		}
+		if reportErr := client.report(ctx, task.ID, "failed", message); reportErr != nil {
 			return fmt.Errorf("execute task: %w; report failure: %v", err, reportErr)
 		}
 		return nil
 	}
-	return client.report(ctx, task.ID, "succeeded", "")
+	return client.report(ctx, task.ID, "succeeded", result.Output)
 }
 func (c *Client) claim(ctx context.Context) (assignment, bool, error) {
 	body, _ := json.Marshal(map[string]string{"runnerId": c.runnerID})

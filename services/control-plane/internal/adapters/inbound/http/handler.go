@@ -88,6 +88,22 @@ func NewHandler(api applications.API) http.Handler {
 		}
 		writeJSON(w, http.StatusOK, toRunResponse(found))
 	})
+	mux.HandleFunc("GET /runs/{runId}/tasks", func(w http.ResponseWriter, r *http.Request) {
+		tasks, found, err := api.ListRunTasks(r.Context(), r.PathValue("runId"))
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !found {
+			writeError(w, http.StatusNotFound, "run not found")
+			return
+		}
+		response := make([]taskExecutionResponse, 0, len(tasks))
+		for _, task := range tasks {
+			response = append(response, taskExecutionResponse{ID: task.ID, TaskID: task.TaskID, Status: task.Status, RunnerID: task.RunnerID, Log: task.Log})
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"tasks": response})
+	})
 	mux.HandleFunc("POST /runner/tasks/claim", func(w http.ResponseWriter, r *http.Request) {
 		var request struct {
 			RunnerID string `json:"runnerId"`
@@ -151,6 +167,13 @@ type taskAssignmentResponse struct {
 	ID    string       `json:"id"`
 	RunID string       `json:"runId"`
 	Task  taskResponse `json:"task"`
+}
+type taskExecutionResponse struct {
+	ID       string `json:"id"`
+	TaskID   string `json:"taskId"`
+	Status   string `json:"status"`
+	RunnerID string `json:"runnerId"`
+	Log      string `json:"log"`
 }
 
 func toApplicationPipeline(value pipelineResponse) applications.Pipeline {
