@@ -8,6 +8,8 @@ import (
 	"os"
 
 	transport "github.com/Design_Pattern/services/control-plane/internal/adapters/inbound/http"
+	"github.com/Design_Pattern/services/control-plane/internal/adapters/outbound/memory"
+	"github.com/Design_Pattern/services/control-plane/internal/applications"
 )
 
 func main() {
@@ -16,7 +18,9 @@ func main() {
 		address = ":8080"
 	}
 
-	handler := transport.NewUnavailableHandler()
+	store := memory.NewStore()
+	api := applications.NewService(memory.Pipelines(store), memory.Runs(store))
+	handler := transport.NewHandler(api)
 	log.Printf("control-plane listening on %s", address)
 	if err := http.ListenAndServe(address, handler); err != nil {
 		log.Fatal(err)
