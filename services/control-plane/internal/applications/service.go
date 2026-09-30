@@ -14,12 +14,13 @@ import (
 type Service struct {
 	pipelines outbound.PipelineRepository
 	runs      outbound.RunRepository
+	tasks     outbound.TaskRepository
 	now       func() time.Time
 	sequence  atomic.Uint64
 }
 
-func NewService(pipelines outbound.PipelineRepository, runs outbound.RunRepository) *Service {
-	return &Service{pipelines: pipelines, runs: runs, now: time.Now}
+func NewService(pipelines outbound.PipelineRepository, runs outbound.RunRepository, tasks outbound.TaskRepository) *Service {
+	return &Service{pipelines: pipelines, runs: runs, tasks: tasks, now: time.Now}
 }
 
 func (s *Service) ListPipelines(ctx context.Context) ([]Pipeline, error) {
@@ -66,7 +67,16 @@ func (s *Service) CreateRun(ctx context.Context, pipelineID string) (Run, error)
 		return Run{}, err
 	}
 	result := toRun(id, pipelineID, domainRun)
-	if err := s.runs.Save(ctx, toStoredRun(result)); err != nil {
+	storedRun := toStoredRun(result)
+	storedRun.Definition = storedPipeline.Definition
+	if err := s.runs.Save(ctx, storedRun); err != nil {
+		return Run{}, err
+	}
+	queued := make([]outbound.StoredTask, 0, len(storedPipeline.Definition.Tasks))
+	for _, task := range storedPipeline.Definition.Tasks {
+		queued = append(queued, outbound.StoredTask{ID: id + ":" + string(task.ID), RunID: id, Task: task, Status: outbound.TaskPending})
+	}
+	if err := s.tasks.Enqueue(ctx, queued); err != nil {
 		return Run{}, err
 	}
 	return result, nil
@@ -88,13 +98,61 @@ func (s *Service) GetRun(ctx context.Context, id string) (Run, bool, error) {
 	return fromStoredRun(stored), found, err
 }
 
-// Runner dispatch is added in the next MVP slice. These methods keep the HTTP
-// inbound port stable while no task dispatcher has been configured yet.
-func (s *Service) ClaimTask(context.Context, string) (TaskAssignment, bool, error) {
-	return TaskAssignment{}, false, nil
+func (s *Service) ClaimTask(ctx context.Context, runnerID string) (TaskAssignment, bool, error) {
+	if strings.TrimSpace(runnerID) == "" {
+		return TaskAssignment{}, false, fmt.Errorf("runner ID is required")
+	}
+	claimed, found, err := s.tasks.ClaimNextRunnable(ctx, runnerID)
+	if err != nil || !found {
+		return TaskAssignment{}, found, err
+	}
+	return TaskAssignment{ID: claimed.ID, RunID: claimed.RunID, Task: claimed.Task}, true, nil
 }
-func (s *Service) ReportTaskEvent(context.Context, string, TaskEventStatus, string) (bool, error) {
-	return false, nil
+func (s *Service) ReportTaskEvent(ctx context.Context, taskID string, status TaskEventStatus, _ string) (bool, error) {
+	task, found, err := s.tasks.Get(ctx, taskID)
+	if err != nil || !found {
+		return found, err
+	}
+	switch status {
+	case TaskEventStarted:
+		if task.Status != outbound.TaskClaimed {
+			return true, fmt.Errorf("task %q cannot start from %q", taskID, task.Status)
+		}
+		task.Status = outbound.TaskRunning
+		if err := s.tasks.Save(ctx, task); err != nil {
+			return true, err
+		}
+		return true, s.transitionRun(ctx, task.RunID, run.StatusRunning)
+	case TaskEventSucceeded:
+		if task.Status != outbound.TaskRunning {
+			return true, fmt.Errorf("task %q cannot succeed from %q", taskID, task.Status)
+		}
+		task.Status = outbound.TaskSucceeded
+		if err := s.tasks.Save(ctx, task); err != nil {
+			return true, err
+		}
+		tasks, err := s.tasks.ListByRun(ctx, task.RunID)
+		if err != nil {
+			return true, err
+		}
+		for _, item := range tasks {
+			if item.Status != outbound.TaskSucceeded {
+				return true, nil
+			}
+		}
+		return true, s.transitionRun(ctx, task.RunID, run.StatusSucceeded)
+	case TaskEventFailed:
+		if task.Status != outbound.TaskRunning {
+			return true, fmt.Errorf("task %q cannot fail from %q", taskID, task.Status)
+		}
+		task.Status = outbound.TaskFailed
+		if err := s.tasks.Save(ctx, task); err != nil {
+			return true, err
+		}
+		return true, s.transitionRun(ctx, task.RunID, run.StatusFailed)
+	default:
+		return true, fmt.Errorf("unsupported task event status %q", status)
+	}
 }
 
 func toRun(id, pipelineID string, value *run.Run) Run {
@@ -116,3 +174,27 @@ func fromStoredRun(value outbound.StoredRun) Run {
 }
 
 var _ API = (*Service)(nil)
+
+func (s *Service) transitionRun(ctx context.Context, id string, next run.Status) error {
+	stored, found, err := s.runs.Get(ctx, id)
+	if err != nil || !found {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("run %q not found", id)
+	}
+	if stored.Status == next {
+		return nil
+	}
+	if stored.Status != run.StatusPending && stored.Status != run.StatusRunning {
+		return fmt.Errorf("run %q is already finished", id)
+	}
+	now := s.now().UTC()
+	stored.Status = next
+	if next == run.StatusRunning {
+		stored.StartedAt = &now
+	} else {
+		stored.EndedAt = &now
+	}
+	return s.runs.Save(ctx, stored)
+}

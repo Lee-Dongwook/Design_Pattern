@@ -19,7 +19,7 @@ func main() {
 	}
 
 	store := memory.NewStore()
-	api := applications.NewService(memory.Pipelines(store), memory.Runs(store))
+	api := applications.NewService(memory.Pipelines(store), memory.Runs(store), memory.Tasks(store))
 	handler := transport.NewHandler(api)
 	log.Printf("control-plane listening on %s", address)
 	if err := http.ListenAndServe(address, handler); err != nil {
