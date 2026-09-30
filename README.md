@@ -8,6 +8,20 @@ Runner는 실행 책임에 집중
 
 Language : Console = TypeScript, Control Plane·Runner = Go, Infrastructure = HCL
 
+### Architecture diagrams
+
+#### Platform deployment architecture
+
+![Platform deployment architecture](docs/img/platform-deployment-architecture.png)
+
+#### Control Plane hexagonal architecture
+
+![Control Plane hexagonal architecture](docs/img/control-plane-hexagonal-architecture.png)
+
+#### Port and adapter dependency flow
+
+![Port and adapter dependency flow](docs/img/port-adapter-dependency-flow.png)
+
 ```
 devops-platform/
 ├── apps/
